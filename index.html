@@ -655,9 +655,108 @@
             document.getElementById('checkout-modal').classList.remove('show');
         }
 
+        function openReceiptPreview(items, totals) {
+            const receiptNumber = `RCPT-${Date.now().toString().slice(-6)}`;
+            const now = new Date();
+            const formattedDate = now.toLocaleDateString('en-US');
+            const formattedTime = now.toLocaleTimeString('en-US');
+
+            const itemsHTML = items.map(item => `
+                <div class="row">
+                    <span>${item.name} x${item.quantity}</span>
+                    <span>₱${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+            `).join('');
+
+            const receiptHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>Receipt Preview</title>
+                    <style>
+                        @page { size: A4; margin: 10mm; }
+                        html, body {
+                            width: 100%;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        body {
+                            font-family: 'Courier New', monospace;
+                            box-sizing: border-box;
+                            width: 100%;
+                            padding: 6mm 6mm 8mm;
+                            font-size: 14px;
+                            line-height: 1.45;
+                        }
+                        .center { text-align: center; }
+                        .title { font-weight: bold; margin-bottom: 8px; font-size: 16px; }
+                        .muted { color: #555; font-size: 12.5px; }
+                        .divider { border-top: 1px dashed #000; margin: 12px 0; }
+                        .row { display: flex; justify-content: space-between; font-size: 14px; margin: 4px 0; }
+                        .totals { font-weight: bold; font-size: 15px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="center">
+                        <div class="title">DECISIVE Fine Dining Restaurant</div>
+                        <div class="muted">Science City of Munoz</div>
+                        <div class="muted">0935-813-229</div>
+                        <div class="muted">Owner: Diana Organez</div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    ${itemsHTML}
+
+                    <div class="divider"></div>
+
+                    <div class="row"><span>Subtotal:</span><span>₱${totals.subtotal.toFixed(2)}</span></div>
+                    <div class="row"><span>Vatable:</span><span>₱${totals.subtotal.toFixed(2)}</span></div>
+                    <div class="row"><span>VAT Amount:</span><span>₱${totals.vatAmount.toFixed(2)}</span></div>
+                    <div class="row"><span>VAT Exempt:</span><span>₱0.00</span></div>
+                    <div class="row"><span>Zero Rated:</span><span>₱0.00</span></div>
+
+                    <div class="divider"></div>
+                    <div class="row totals"><span>Total:</span><span>₱${totals.total.toFixed(2)}</span></div>
+
+                    <div class="divider"></div>
+                    <div class="muted center">Receipt #: ${receiptNumber}</div>
+                    <div class="muted center">${formattedDate} ${formattedTime}</div>
+
+                    <script>
+                        window.onload = () => {
+                            window.print();
+                            setTimeout(() => window.close(), 500);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `;
+
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.open();
+                printWindow.document.write(receiptHTML);
+                printWindow.document.close();
+                printWindow.focus();
+            } else {
+                const blob = new Blob([receiptHTML], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+            }
+        }
+
         function confirmCheckout() {
-            if (Object.keys(cart).length === 0) return;
-            
+            const cartItems = Object.values(cart).filter(item => item.quantity > 0);
+            if (cartItems.length === 0) return;
+
+            const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const vatAmount = subtotal * 0.12;
+            const total = subtotal + vatAmount;
+
+            openReceiptPreview(cartItems, { subtotal, vatAmount, total });
+
             cart = {};
             updateDisplay();
             closeCheckoutModal();
